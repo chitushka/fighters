@@ -4,6 +4,7 @@ const Data = preload("res://scripts/data.gd")
 const Art = preload("res://scripts/art.gd")
 const Fighter = preload("res://scripts/fighter.gd")
 const Sound = preload("res://scripts/sound.gd")
+const TouchControls = preload("res://scripts/touch_controls.gd")
 const GOLD = Color("e5bf76")
 const WHITE = Color("f3eee2")
 const MUTED = Color("9aa8ae")
@@ -46,6 +47,8 @@ var pending_attacks: Array = [-1,-1]
 var pending_until: Array = [0.0,0.0]
 var pending_jumps: Array = [false,false]
 var roster_page: int = 0
+var mobile: bool = OS.has_feature("android") or "--touch" in OS.get_cmdline_user_args()
+var touch_controls: Node
 
 func _ready() -> void:
 	font=ThemeDB.fallback_font
@@ -57,6 +60,9 @@ func _ready() -> void:
 	audio=Sound.new()
 	add_child(audio)
 	setup_input()
+	if mobile:
+		touch_controls=TouchControls.new()
+		add_child(touch_controls)
 	load_settings()
 	roster_page=selected/3 as int
 	get_window().title="ДИКИЙ ИНСТИНКТ • WILD INSTINCT"
@@ -71,6 +77,17 @@ func _ready() -> void:
 		fighters[0].x=435
 		fighters[1].x=845
 	queue_redraw()
+
+func _notification(what: int) -> void:
+	if what==NOTIFICATION_WM_GO_BACK_REQUEST:
+		if screen=="battle": screen="pause"
+		elif screen=="pause": screen="battle"
+		elif screen=="guide": screen=back_screen
+		elif screen=="result": screen="menu"
+		else: get_tree().quit()
+	if what==NOTIFICATION_APPLICATION_FOCUS_OUT and mobile:
+		if screen=="battle": screen="pause"
+		if is_instance_valid(touch_controls): touch_controls.clear()
 
 func setup_input() -> void:
 	var mapping={
@@ -545,10 +562,14 @@ func draw_menu() -> void:
 	else:
 		center("СТРЕЛКИ + 1 / 2 / 3 / 4 / 0" if mode==1 else "БЕСКОНЕЧНЫЙ БОЙ • R — СБРОС",Vector2(1017,619),12,MUTED)
 	button("guide",Rect2(52,653,222,39),"ПРИЁМЫ И ПРАВИЛА  ↗")
-	txt("A D  ДВИЖЕНИЕ    W  ПРЫЖОК    J K L I  АТАКИ",Vector2(295,671),12,MUTED)
-	txt("ПРОБЕЛ  БЛОК     F11  ПОЛНЫЙ ЭКРАН",Vector2(295,690),11,Color("6e808a"))
+	if mobile:
+		txt("ДЖОЙСТИК СЛЕВА • КНОПКИ АТАК СПРАВА",Vector2(295,671),12,MUTED)
+		txt("ДВА ИГРОКА — С ВНЕШНЕЙ КЛАВИАТУРОЙ",Vector2(295,690),11,Color("6e808a"))
+	else:
+		txt("A D  ДВИЖЕНИЕ    W  ПРЫЖОК    J K L I  АТАКИ",Vector2(295,671),12,MUTED)
+		txt("ПРОБЕЛ  БЛОК     F11  ПОЛНЫЙ ЭКРАН",Vector2(295,690),11,Color("6e808a"))
 	button("start",Rect2(981,650,247,44),"НАЧАТЬ БОЙ    →",false,true)
-	txt("ENTER",Vector2(927,679),10,MUTED)
+	if not mobile: txt("ENTER",Vector2(927,679),10,MUTED)
 
 func draw_battle() -> void:
 	var offset=Vector2(sin(time*83),cos(time*71))*shake
@@ -652,6 +673,9 @@ func draw_hud() -> void:
 	panel(Rect2(578,44,124,76),Color("101923"),GOLD.darkened(0.5))
 	center("∞" if mode==2 else str(int(ceil(timer))).pad_zeros(2),Vector2(640,93),45,ORANGE if timer<15 else WHITE,true)
 	center("РАУНД "+str(round_number),Vector2(640,112),9,GOLD)
+	if mobile:
+		if mode==2: center("ТРЕНИРОВКА • ЗДОРОВЬЕ ВОССТАНАВЛИВАЕТСЯ",Vector2(560,708),10,MUTED)
+		return
 	draw_rect(Rect2(0,675,1280,45),Color(0.025,0.04,0.06,0.94))
 	txt("A D  ШАГ    W  ПРЫЖОК    S  ПРИСЕСТЬ",Vector2(30,694),11,MUTED)
 	txt("J  УДАР / УДЕРЖИВАТЬ    K  ДАЛЬНИЙ    L  ОСОБЫЙ    I  УЛЬТА    ПРОБЕЛ  БЛОК",Vector2(341,694),11,WHITE)

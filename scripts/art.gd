@@ -39,6 +39,12 @@ static func character(c: CanvasItem, kind: int, p: Vector2, size: float, facing:
 				leopard(c, t, reach)
 			else:
 				squirrel(c, t, action, reach, blocking)
+		3: scorpion(c,t,reach)
+		4,6,9,11: warrior(c,kind,t,reach,blocking)
+		5: phoenix(c,t,reach)
+		7: mantis(c,t,reach)
+		8: kraken(c,t,reach)
+		10: golem(c,t,reach)
 	if hurt > 0:
 		for i in 6:
 			var a = i * TAU / 6 + t
@@ -220,14 +226,214 @@ static func leopard(c: CanvasItem, t: float, reach: float) -> void:
 		for i in 3:
 			c.draw_line(Vector2(108,-70+i*10),Vector2(154,-59+i*13),Color(1,0.87,0.6,reach),3,true)
 
+static func scorpion(c: CanvasItem,t: float,r: float) -> void:
+	var edge=Color("301c29")
+	var shell=Color("b9494d")
+	var hi=Color("ef9274")
+	# Six articulated legs and an unmistakable arched segmented tail.
+	for i in 6:
+		var x=-59+i*23
+		var sway=sin(t*6+i)*5
+		stroke(c,[Vector2(x,-57),Vector2(x-21,-32),Vector2(x+13+sway,-7)],edge,12)
+		stroke(c,[Vector2(x,-57),Vector2(x-21,-32),Vector2(x+13+sway,-7)],hi.darkened(0.35),5)
+	for i in 9:
+		var a=-0.7-i*0.31
+		var p=Vector2(-44,-124)+Vector2(cos(a)*71,sin(a)*88)
+		oval(c,p,Vector2(17-i*0.7,15),edge)
+		oval(c,p+Vector2(0,-2),Vector2(13-i*0.5,11),shell.lightened(i*0.025))
+	poly(c,[Vector2(-102,-173),Vector2(-78,-201),Vector2(-61+r*64,-177),Vector2(-74+r*48,-142)],hi)
+	oval(c,Vector2(-12,-64),Vector2(70,34),edge)
+	oval(c,Vector2(-12,-68),Vector2(64,28),shell)
+	for i in 5:
+		c.draw_line(Vector2(-57+i*23,-88),Vector2(-57+i*23,-45),edge,2,true)
+	curve(c,Vector2(4,-77),Vector2(-38,-109),Vector2(-58,-138),Vector2(-23+r*65,-145),edge,23)
+	curve(c,Vector2(4,-77),Vector2(-38,-109),Vector2(-58,-138),Vector2(-23+r*65,-145),shell,15)
+	curve(c,Vector2(30,-69),Vector2(102,-77),Vector2(57+r*50,-121),Vector2(88+r*56,-126),edge,27)
+	curve(c,Vector2(30,-69),Vector2(102,-77),Vector2(57+r*50,-121),Vector2(88+r*56,-126),shell,19)
+	for p in [Vector2(-16+r*65,-151),Vector2(91+r*56,-130)]:
+		oval(c,p,Vector2(27,25),edge)
+		oval(c,p+Vector2(1,-3),Vector2(22,20),shell)
+		poly(c,[p+Vector2(4,-22),p+Vector2(34,-10),p+Vector2(17,-3),p+Vector2(39,12),p+Vector2(6,22)],hi)
+	oval(c,Vector2(33,-87),Vector2(27,24),shell)
+	c.draw_line(Vector2(25,-98),Vector2(42,-96),Color("ffe08d"),4,true)
+	c.draw_line(Vector2(32,-100),Vector2(32,-93),edge,2)
+
+static func warrior(c: CanvasItem,kind: int,t: float,r: float,blocking: bool) -> void:
+	var edge=Color("1b2433")
+	var base=Color("c6e8ed") if kind==4 else Color("696088") if kind==6 else Color("25303a") if kind==9 else Color("844c85")
+	var accent=Color("9ce5ff") if kind==4 else Color("bda9fb") if kind==6 else Color("edd286") if kind==9 else Color("ff8bd0")
+	var bulky=kind==6
+	# Tails: wolf plume, jackal sweep, three luminous fox tails.
+	if not bulky:
+		for i in (3 if kind==11 else 1):
+			var end=Vector2(-104-i*12,-102-i*34+sin(t*2+i)*9)
+			curve(c,Vector2(-28,-50),Vector2(-104,-26-i*19),Vector2(-111-i*23,-69-i*23),end,edge,35-i*4)
+			curve(c,Vector2(-28,-50),Vector2(-104,-26-i*19),Vector2(-111-i*23,-69-i*23),end,base,26-i*3)
+			c.draw_line(end,end+Vector2(8,25),accent,6,true)
+	for i in 2:
+		var x=-28+i*50
+		curve(c,Vector2(x,-61),Vector2(x-7,-36),Vector2(x-10,-13),Vector2(x+14,-8),edge,30 if bulky else 23)
+		curve(c,Vector2(x,-61),Vector2(x-7,-36),Vector2(x-10,-13),Vector2(x+14,-8),base,21 if bulky else 15)
+		c.draw_line(Vector2(x-8,-22),Vector2(x+8,-20),accent,3)
+	oval(c,Vector2(0,-112),Vector2(61 if bulky else 39,65),edge)
+	oval(c,Vector2(0,-115),Vector2(55 if bulky else 33,59),base)
+	poly(c,[Vector2(-29,-157),Vector2(30,-157),Vector2(23,-99),Vector2(0,-84),Vector2(-25,-102)],accent.darkened(0.35))
+	stroke(c,[Vector2(-20,-147),Vector2(0,-126),Vector2(21,-147)],accent,4)
+	var hand=Vector2(74+r*71,-119-r*24)
+	if blocking: hand=Vector2(55,-175)
+	for side in [-1,1]:
+		var start=Vector2(side*31,-144)
+		var end=hand if side==1 else Vector2(-51+r*30,-102)
+		curve(c,start,Vector2(side*66,-141),Vector2(end.x-17,end.y+14),end,edge,31 if bulky else 21)
+		curve(c,start,Vector2(side*66,-141),Vector2(end.x-17,end.y+14),end,base,22 if bulky else 14)
+		oval(c,end,Vector2(18 if bulky else 12,14),accent.darkened(0.3))
+	oval(c,Vector2(12,-182),Vector2(38 if bulky else 28,31),edge)
+	oval(c,Vector2(12,-184),Vector2(33 if bulky else 24,26),base)
+	if bulky:
+		poly(c,[Vector2(29,-181),Vector2(62,-213),Vector2(55,-175),Vector2(72,-168),Vector2(21,-158)],Color("e3dddb"))
+		for x in [-52,-25,2,29]:
+			poly(c,[Vector2(x,-151),Vector2(x+15,-178),Vector2(x+27,-151)],accent.darkened(0.2))
+		stroke(c,[Vector2(-8,-146),Vector2(7,-133),Vector2(-3,-117),Vector2(16,-104)],accent,3)
+	else:
+		for x in [-9,23]:
+			poly(c,[Vector2(x-9,-200),Vector2(x-10,-240 if kind==9 else -226),Vector2(x+13,-199)],edge)
+			poly(c,[Vector2(x-4,-204),Vector2(x-6,-230 if kind==9 else -218),Vector2(x+7,-203)],accent.darkened(0.25))
+		poly(c,[Vector2(22,-184),Vector2(62,-171),Vector2(51,-156),Vector2(13,-161)],base.lightened(0.17))
+		poly(c,[Vector2(50,-173),Vector2(65,-170),Vector2(55,-163)],edge)
+	if kind==4:
+		for i in 7:
+			poly(c,[Vector2(-32+i*6,-174),Vector2(-53+i*7,-183-i%2*12),Vector2(-33+i*6,-136)],accent)
+	if kind==9:
+		poly(c,[Vector2(-34,-152),Vector2(35,-152),Vector2(21,-132),Vector2(-22,-132)],accent)
+		c.draw_line(Vector2(0,-148),Vector2(0,-133),edge,3)
+		poly(c,[Vector2(-34,-62),Vector2(35,-62),Vector2(45,-43),Vector2(-40,-43)],accent)
+		var p=hand+Vector2(10,0)
+		c.draw_line(p+Vector2(0,-92),p+Vector2(0,113),accent,6,true)
+		c.draw_arc(p+Vector2(0,-96),17,0.25,5.7,24,accent,5,true)
+	if kind==11:
+		poly(c,[Vector2(-11,-192),Vector2(36,-190),Vector2(42,-175),Vector2(3,-174)],edge)
+		c.draw_line(Vector2(3,-183),Vector2(34,-183),accent,5,true)
+		for i in 3:
+			c.draw_line(hand+Vector2(9,-8+i*7),hand+Vector2(31,-16+i*7),accent,3,true)
+	else:
+		c.draw_line(Vector2(11,-187),Vector2(32,-184),edge,5,true)
+		c.draw_circle(Vector2(25,-185),3,accent.lightened(0.5))
+
+static func phoenix(c: CanvasItem,t: float,r: float) -> void:
+	var red=Color("b84645")
+	var gold=Color("ffc878")
+	var edge=Color("3d2433")
+	# Layered tail feathers and two hinged wings.
+	for i in 5:
+		poly(c,[Vector2(-17+i*8,-77),Vector2(-97+i*21,-12-i%2*12),Vector2(-61+i*17,-84)],red.lightened(i*0.045))
+	for side in [-1,1]:
+		var lift=sin(t*3)*7+r*36
+		var shoulder=Vector2(side*22,-140)
+		for i in 6:
+			poly(c,[shoulder,Vector2(side*(103+i*5+r*28),-175+i*11-lift),Vector2(side*(74+i*6),-100+i*7)],red.lightened(i*0.055))
+		stroke(c,[shoulder,Vector2(side*78,-159-lift),Vector2(side*(127+r*28),-127-lift)],gold,3)
+	for side in [-1,1]:
+		stroke(c,[Vector2(side*17,-55),Vector2(side*26,-18),Vector2(side*33+20,-10)],gold,9)
+		for i in 3: c.draw_line(Vector2(side*33+15,-10),Vector2(side*33+34,-15+i*7),Color("fff1c2"),2,true)
+	oval(c,Vector2(0,-112),Vector2(34,59),edge)
+	oval(c,Vector2(0,-115),Vector2(28,54),red)
+	oval(c,Vector2(6,-105),Vector2(16,35),gold)
+	oval(c,Vector2(13,-180),Vector2(28,30),red)
+	for i in 4:
+		poly(c,[Vector2(-8+i*9,-200),Vector2(-27+i*14,-241+i%2*15),Vector2(17+i*7,-198)],gold)
+	poly(c,[Vector2(31,-188),Vector2(65+r*12,-173),Vector2(36,-161)],gold)
+	c.draw_line(Vector2(12,-185),Vector2(31,-184),edge,5,true)
+	c.draw_circle(Vector2(25,-185),3,Color("fff5d0"))
+	for i in 8:
+		var p=Vector2(-12+sin(i*2+t)*40,-60-fposmod(t*45+i*19,150))
+		c.draw_circle(p,2,Color(1,0.6,0.2,0.4))
+
+static func mantis(c: CanvasItem,t: float,r: float) -> void:
+	var edge=Color("153d3a")
+	var green=Color("72c995")
+	var hi=Color("c0f2b3")
+	for side in [-1,1]:
+		stroke(c,[Vector2(side*13,-87),Vector2(side*48,-41),Vector2(side*28,-7)],edge,14)
+		stroke(c,[Vector2(side*13,-87),Vector2(side*48,-41),Vector2(side*28,-7)],green,7)
+	poly(c,[Vector2(-22,-149),Vector2(-61,-77),Vector2(-13,-36),Vector2(18,-99)],Color("3f7f66"))
+	oval(c,Vector2(-8,-103),Vector2(22,54),edge)
+	oval(c,Vector2(-8,-105),Vector2(15,49),green)
+	stroke(c,[Vector2(3,-147),Vector2(17,-184)],green,16)
+	for side in [-1,1]:
+		var hand=Vector2(48+r*70,-145+side*26-r*15)
+		stroke(c,[Vector2(side*14,-145),Vector2(side*47,-104),hand],edge,14)
+		stroke(c,[Vector2(side*14,-145),Vector2(side*47,-104),hand],green,7)
+		poly(c,[hand+Vector2(-8,-6),hand+Vector2(54,-52),hand+Vector2(35,11),hand+Vector2(19,-10)],hi)
+		c.draw_line(hand+Vector2(20,-11),hand+Vector2(52,-50),edge,2,true)
+	poly(c,[Vector2(-28,-202),Vector2(52,-201),Vector2(14,-165)],edge)
+	poly(c,[Vector2(-24,-200),Vector2(48,-199),Vector2(14,-171)],green)
+	for x in [-17,39]:
+		c.draw_circle(Vector2(x,-198),10,hi)
+		c.draw_circle(Vector2(x+2,-199),3,edge)
+	stroke(c,[Vector2(1,-201),Vector2(-15,-228),Vector2(-5,-238)],green,2)
+	stroke(c,[Vector2(24,-201),Vector2(40,-228),Vector2(32,-239)],green,2)
+
+static func kraken(c: CanvasItem,t: float,r: float) -> void:
+	var edge=Color("29213d")
+	var purple=Color("9270b5")
+	for i in 8:
+		var x=-76+i*22
+		var end=Vector2(x+sin(t*3+i)*19,-7-i%2*12)
+		var start=Vector2(-28+i*9,-88)
+		curve(c,start,Vector2(x*0.9,-72-r*30),Vector2(x*1.5,-26),end,edge,25)
+		curve(c,start,Vector2(x*0.9,-72-r*30),Vector2(x*1.5,-26),end,purple,18)
+		for j in 3:
+			c.draw_circle(end.lerp(start,j/5.0),3,Color("e6a7c9"))
+	oval(c,Vector2(0,-144),Vector2(51,73),edge)
+	oval(c,Vector2(0,-148),Vector2(45,67),purple)
+	oval(c,Vector2(-13,-170),Vector2(21,34),purple.lightened(0.13))
+	for side in [-1,1]:
+		var end=Vector2(side*73+r*57,-139-r*19)
+		curve(c,Vector2(side*31,-100),Vector2(side*116,-63),Vector2(side*123+r*45,-189),end,edge,23)
+		curve(c,Vector2(side*31,-100),Vector2(side*116,-63),Vector2(side*123+r*45,-189),end,purple,15)
+		oval(c,Vector2(side*19,-142),Vector2(13,17),Color("f4dba9"))
+		c.draw_line(Vector2(side*19,-153),Vector2(side*19,-132),edge,4)
+	poly(c,[Vector2(-8,-108),Vector2(8,-108),Vector2(0,-92)],edge)
+	for i in 6: c.draw_circle(Vector2(sin(i*2)*30,-184+i%2*13),3,Color("c5a5dc"))
+
+static func golem(c: CanvasItem,t: float,r: float) -> void:
+	var edge=Color("284653")
+	var ice=Color("86bbcf")
+	var hi=Color("d2f4f5")
+	for side in [-1,1]:
+		poly(c,[Vector2(side*15,-69),Vector2(side*49,-73),Vector2(side*61,-15),Vector2(side*27,-6),Vector2(side*18,-37)],edge)
+		poly(c,[Vector2(side*22,-66),Vector2(side*42,-69),Vector2(side*51,-19),Vector2(side*31,-14)],ice)
+	poly(c,[Vector2(-63,-158),Vector2(-39,-187),Vector2(37,-184),Vector2(64,-153),Vector2(45,-67),Vector2(-38,-63)],edge)
+	poly(c,[Vector2(-56,-155),Vector2(-33,-180),Vector2(33,-177),Vector2(56,-151),Vector2(39,-74),Vector2(-34,-70)],ice)
+	poly(c,[Vector2(-33,-177),Vector2(9,-165),Vector2(-2,-79),Vector2(-34,-70)],Color("b1dbe4"))
+	stroke(c,[Vector2(12,-165),Vector2(1,-134),Vector2(25,-113),Vector2(10,-76)],hi,3)
+	for side in [-1,1]:
+		var shift=r*64 if side==1 else r*20
+		var hand=Vector2(side*82+shift,-98-r*30)
+		curve(c,Vector2(side*45,-150),Vector2(side*88,-149),Vector2(side*70+shift,-119),hand,edge,46)
+		curve(c,Vector2(side*45,-150),Vector2(side*88,-149),Vector2(side*70+shift,-119),hand,ice,34)
+		poly(c,[hand+Vector2(-23,-19),hand+Vector2(20,-24),hand+Vector2(29,13),hand+Vector2(-11,23)],hi)
+		for i in 3:
+			poly(c,[Vector2(side*(41+i*15),-154),Vector2(side*(48+i*17),-204+i*6),Vector2(side*(57+i*13),-153)],hi.darkened(i*0.09))
+	poly(c,[Vector2(-28,-208),Vector2(9,-229),Vector2(34,-207),Vector2(26,-172),Vector2(-23,-174)],ice)
+	poly(c,[Vector2(9,-229),Vector2(34,-207),Vector2(26,-172),Vector2(6,-177)],hi)
+	c.draw_line(Vector2(-15,-197),Vector2(1,-193),Color("2778a0"),5,true)
+	c.draw_line(Vector2(12,-193),Vector2(25,-198),Color("2778a0"),5,true)
+
 static func arena(c: CanvasItem, stage: int, t: float, font: Font) -> void:
 	match stage:
 		0: island(c,t)
 		1: city(c,t,font)
 		2: moon(c,t)
+		3: desert(c,t)
+		4: citadel(c,t)
+		5: bamboo(c,t)
+		6: abyss(c,t)
+		7: rooftop(c,t,font)
 	# Foreground fighting platform.
-	c.draw_rect(Rect2(0,566,1280,154),Color("101820") if stage!=2 else Color("242b36"))
-	poly(c,[Vector2(0,566),Vector2(1280,566),Vector2(1280,583),Vector2(0,583)],Color("334044"))
+	var floors=[Color("101820"),Color("101820"),Color("242b36"),Color("56412e"),Color("324d66"),Color("1d3832"),Color("123b4b"),Color("202037")]
+	c.draw_rect(Rect2(0,566,1280,154),floors[stage])
+	poly(c,[Vector2(0,566),Vector2(1280,566),Vector2(1280,583),Vector2(0,583)],floors[stage].lightened(0.15))
 	c.draw_line(Vector2(0,567),Vector2(1280,567),Color("96917b"),2)
 	for i in 16:
 		var x=i*97
@@ -352,3 +558,141 @@ static func moon(c: CanvasItem,t: float) -> void:
 	c.draw_line(Vector2(307,488),Vector2(307,411),Color("b8bac4"),2)
 	poly(c,[Vector2(308,412),Vector2(353,416),Vector2(353,440),Vector2(308,436)],Color("d0bf91"))
 	c.draw_circle(Vector2(328,426),6,Color("5b6a80"))
+
+static func desert(c: CanvasItem,t: float) -> void:
+	c.draw_rect(Rect2(0,0,1280,570),Color("544550"))
+	for i in 24:
+		c.draw_rect(Rect2(0,i*24,1280,25),Color("5f4753").lerp(Color("d49569"),i/24.0))
+	c.draw_circle(Vector2(901,190),76,Color("fbd19a"))
+	poly(c,[Vector2(415,467),Vector2(644,204),Vector2(889,467)],Color("8c624c"))
+	poly(c,[Vector2(644,204),Vector2(889,467),Vector2(684,463)],Color("634b44"))
+	poly(c,[Vector2(45,455),Vector2(256,273),Vector2(439,455)],Color("a87557"))
+	poly(c,[Vector2(256,273),Vector2(439,455),Vector2(277,453)],Color("7e5b49"))
+	for j in 3:
+		var pts:Array=[Vector2(0,570),Vector2(0,437+j*39)]
+		for i in 33:
+			pts.append(Vector2(i*40,445+j*35+sin(i*0.25+j*2)*29))
+		pts.append(Vector2(1280,570))
+		poly(c,pts,[Color("bb835e"),Color("a37252"),Color("805c46")][j])
+	for x in [101,1129]:
+		c.draw_rect(Rect2(x,290,48,278),Color("4d4540"))
+		c.draw_rect(Rect2(x-14,279,76,20),Color("998164"))
+		c.draw_rect(Rect2(x-9,546,66,22),Color("998164"))
+		for i in 6:
+			c.draw_line(Vector2(x+9,319+i*35),Vector2(x+35,319+i*35),Color("ac8a60"),2)
+		for i in 4: c.draw_circle(Vector2(x+22+sin(i*3)*9,335+i*43),3,Color("cfaa72"))
+	for i in 28:
+		var x=fposmod(i*173+t*47,1280)
+		var y=455+fmod(i*71,102)
+		c.draw_line(Vector2(x,y),Vector2(x+20,y-2),Color(1,0.82,0.57,0.12),1,true)
+
+static func citadel(c: CanvasItem,t: float) -> void:
+	c.draw_rect(Rect2(0,0,1280,570),Color("172b43"))
+	# Aurora ribbons, icy peaks and an arched fortress.
+	for j in 7:
+		var pts:Array=[]
+		for i in 40:
+			pts.append(Vector2(i*34,140+j*9+sin(i*0.18+t*0.15+j*0.1)*47))
+		stroke(c,pts,Color(0.35,0.95,0.78,0.035+j*0.004),14)
+	for i in 7:
+		var x=i*224-90
+		poly(c,[Vector2(x-140,519),Vector2(x,239+i%2*57),Vector2(x+195,519)],Color("405e79"))
+		poly(c,[Vector2(x,239+i%2*57),Vector2(x+67,385),Vector2(x+17,361),Vector2(x-17,375),Vector2(x-46,346)],Color("a4c8d6"))
+	c.draw_rect(Rect2(410,317,460,250),Color("294254"))
+	for x in [375,844]:
+		c.draw_rect(Rect2(x,269,73,298),Color("45667d"))
+		poly(c,[Vector2(x-12,271),Vector2(x+36,205),Vector2(x+85,271)],Color("accfdc"))
+		for j in 5: c.draw_rect(Rect2(x+15,293+j*47,17,26),Color("153247"))
+	oval(c,Vector2(640,423),Vector2(71,98),Color("132a40"))
+	c.draw_rect(Rect2(569,423,142,144),Color("132a40"))
+	for i in 11:
+		poly(c,[Vector2(425+i*40,317),Vector2(437+i*40,357+i%3*9),Vector2(451+i*40,317)],Color("a3dbe6"))
+	for i in 65:
+		var p=Vector2(fposmod(i*171+sin(t+i)*12,1280),fposmod(i*69+t*30,565))
+		c.draw_circle(p,1.2+i%3*0.6,Color(0.82,0.94,1,0.45))
+
+static func bamboo(c: CanvasItem,t: float) -> void:
+	c.draw_rect(Rect2(0,0,1280,570),Color("183d3b"))
+	c.draw_circle(Vector2(838,200),57,Color("96bda0"))
+	for i in 21:
+		var x=i*71+sin(i*3)*30
+		var depth=float(i%3)/3
+		var col=Color("356858").darkened(depth*0.5)
+		c.draw_line(Vector2(x,565),Vector2(x+sin(i)*28,90),col,11+i%3*4,true)
+		for j in 6:
+			var p=Vector2(x+sin(i)*j*4,132+j*65)
+			c.draw_line(p-Vector2(7,0),p+Vector2(7,0),col.lightened(0.15),3,true)
+			for side in [-1,1]:
+				poly(c,[p,p+Vector2(side*62,-26),p+Vector2(side*43,5)],col.lightened(0.05))
+	for i in 4:
+		oval(c,Vector2(340+i*290,471+i%2*30),Vector2(365,35),Color(0.45,0.72,0.63,0.06))
+	c.draw_rect(Rect2(0,521,1280,46),Color("244d48"))
+	for i in 17:
+		var x=i*81
+		c.draw_line(Vector2(x,540+i%3*8),Vector2(x+45,540+i%3*8),Color(0.5,0.74,0.66,0.25),1,true)
+	for x in [184,1070]:
+		c.draw_line(Vector2(x,0),Vector2(x,298),Color("162f2d"),2)
+		oval(c,Vector2(x,325),Vector2(21,29),Color("d3ae73"))
+		c.draw_line(Vector2(x-15,301),Vector2(x+15,301),Color("553f36"),5)
+		c.draw_line(Vector2(x-15,350),Vector2(x+15,350),Color("553f36"),5)
+	for i in 31:
+		var p=Vector2(fmod(i*193+sin(t+i)*23,1280),255+fmod(i*91,260)+cos(t+i)*8)
+		c.draw_circle(p,2,Color(0.85,1,0.5,0.3+0.3*sin(t*2+i)))
+
+static func abyss(c: CanvasItem,t: float) -> void:
+	for i in 24:
+		c.draw_rect(Rect2(0,i*24,1280,25),Color("155064").lerp(Color("0b223c"),i/24.0))
+	for i in 6:
+		var x=i*250-50
+		poly(c,[Vector2(x,0),Vector2(x+46,0),Vector2(x+199,565),Vector2(x-62,565)],Color(0.3,0.85,0.85,0.025))
+	for x in [133,363,871,1110]:
+		c.draw_rect(Rect2(x,356,42,211),Color("285361"))
+		c.draw_rect(Rect2(x-9,346,60,17),Color("3f6a70"))
+		for i in 5: c.draw_line(Vector2(x+5,375+i*39),Vector2(x+35,375+i*39),Color("376470"),2)
+	poly(c,[Vector2(493,566),Vector2(493,453),Vector2(541,412),Vector2(723,412),Vector2(773,453),Vector2(773,566)],Color("234958"))
+	oval(c,Vector2(634,498),Vector2(67,61),Color("0b2d42"))
+	c.draw_rect(Rect2(567,497,134,70),Color("0b2d42"))
+	for i in 6:
+		var p=Vector2(70+i*231+sin(t*0.6+i)*20,170+i%3*47)
+		oval(c,p,Vector2(25,17),Color(0.6,0.6,1,0.22))
+		for j in 4:
+			curve(c,p+Vector2(-15+j*10,7),p+Vector2(-23+j*12,34),p+Vector2(-7+j*9,42),p+Vector2(-12+j*10+sin(t+i)*10,64),Color(0.65,0.6,1,0.22),2)
+	for i in 23:
+		var x=fmod(i*179,1280)
+		var y=fposmod(i*57-t*23,560)
+		c.draw_arc(Vector2(x,y),2+i%3,0,TAU,12,Color(0.52,0.85,0.9,0.22),1,true)
+	for i in 14:
+		var x=i*99
+		var col=Color("87627d") if i%2==0 else Color("4b8d86")
+		stroke(c,[Vector2(x,567),Vector2(x+4,532),Vector2(x-13,511)],col,8)
+		stroke(c,[Vector2(x+4,544),Vector2(x+25,525),Vector2(x+22,506)],col,5)
+
+static func rooftop(c: CanvasItem,t: float,font: Font) -> void:
+	c.draw_rect(Rect2(0,0,1280,570),Color("201a37"))
+	for i in 43:
+		c.draw_circle(Vector2(fmod(i*173,1280),fmod(i*47,290)),1,Color(0.8,0.65,0.92,0.35))
+	c.draw_circle(Vector2(986,181),58,Color("a897bb"))
+	for i in 19:
+		var x=i*77-30
+		var h=100+fmod(i*137,180)
+		c.draw_rect(Rect2(x,541-h,66,h),Color("312943") if i%2==0 else Color("26273d"))
+		for j in 8:
+			for k in 3:
+				if (i+j+k)%3==0: c.draw_rect(Rect2(x+10+k*16,551-h+j*24,5,9),Color("9c799c"))
+	for i in 4:
+		var x=153+i*310
+		c.draw_line(Vector2(x,479),Vector2(x-250+sin(t*0.2+i)*180,0),Color(0.88,0.23,0.7,0.05),16,true)
+	c.draw_line(Vector2(0,513),Vector2(1280,513),Color("ce70ba"),3,true)
+	for x in range(20,1280,65):
+		c.draw_line(Vector2(x,512),Vector2(x,565),Color("53435e"),3)
+	for x in [67,1193]:
+		c.draw_line(Vector2(x,566),Vector2(x,253),Color("51465d"),7)
+		for i in 4:
+			c.draw_line(Vector2(x-25-i*7,270+i*32),Vector2(x+25+i*7,270+i*32),Color("716278"),4)
+		c.draw_circle(Vector2(x,242),4,Color("ff9dc9"))
+	c.draw_rect(Rect2(322,300,170,77),Color("292338"))
+	c.draw_rect(Rect2(322,300,170,77),Color("e57ebd"),false,2)
+	c.draw_string(font,Vector2(343,348),"INSTINCT",HORIZONTAL_ALIGNMENT_LEFT,-1,27,Color("f4aad7"))
+	for x in [92,1102]:
+		c.draw_rect(Rect2(x,536,83,31),Color("3e3d53"))
+		for i in 5: c.draw_line(Vector2(x+9,543+i*4),Vector2(x+73,543+i*4),Color("687187"),1)

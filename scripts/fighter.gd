@@ -27,6 +27,9 @@ var name_time: float = 0.0
 var walk: float = 0.0
 var buffer: int = -1
 var buffer_time: float = 0.0
+var slow_time: float = 0.0
+var feedback: String = ""
+var feedback_time: float = 0.0
 
 func _init(character: int = 0, start_x: float = 360.0) -> void:
 	kind = character
@@ -41,15 +44,24 @@ func progress() -> float:
 	return elapsed / (move.startup + move.active + move.recovery)
 
 func attack(which: int) -> bool:
-	if hp <= 0 or stun > 0: return false
+	if hp <= 0: return false
+	if stun > 0:
+		buffer=which
+		buffer_time=0.28
+		return false
 	if action >= 0:
 		# On-hit special cancel: a confirmed normal may flow into a special.
 		if not (action == 0 and did_hit and which > 0 and elapsed >= move.startup):
 			buffer = which
-			buffer_time = 0.14
+			buffer_time = 0.20
 			return false
 	var spec: Dictionary = Data.MOVES[kind][which]
-	if energy < spec.cost: return false
+	if energy < spec.cost:
+		feedback="НУЖНО "+str(int(spec.cost))+" ЭНЕРГИИ • J БЕСПЛАТНО"
+		feedback_time=1.2
+		return false
+	buffer=-1
+	buffer_time=0
 	energy -= spec.cost
 	action = which
 	elapsed = 0
@@ -59,8 +71,10 @@ func attack(which: int) -> bool:
 	block = false
 	last_name = spec.name
 	name_time = 1.7
-	if which == 2 and y >= -1 and kind != 1:
-		vy = -350 if kind == 0 else -440
+	if which == 2 and y >= -1:
+		if kind==0: vy=-350
+		elif kind==2: vy=-440
+		elif move.has("jump"): vy=move.jump
 	if which == 3: invincible = 0.25
 	return true
 
@@ -71,6 +85,8 @@ func step(dt: float, cmd: Dictionary, enemy_x: float, gravity: float) -> void:
 	name_time = maxf(0,name_time-dt)
 	combo_time = maxf(0,combo_time-dt)
 	buffer_time = maxf(0,buffer_time-dt)
+	slow_time=maxf(0,slow_time-dt)
+	feedback_time=maxf(0,feedback_time-dt)
 	if combo_time <= 0:
 		combo=0
 		combo_damage=0
@@ -88,13 +104,16 @@ func step(dt: float, cmd: Dictionary, enemy_x: float, gravity: float) -> void:
 			block=cmd.get("block",false) and y >= -1
 			crouch=cmd.get("crouch",false) and y >= -1
 			walk=float(cmd.get("axis",0)) if not block and not crouch else 0.0
-			x += walk*Data.SPEED[kind]*dt
+			x += walk*Data.SPEED[kind]*dt*(0.55 if slow_time>0 else 1.0)
 			if cmd.get("jump",false) and y>=-1 and not block:
 				vy=-610
 		else:
 			block=false
 			walk=0.0
 		var request: int=cmd.get("attack",-1)
+		if request<0 and action<0 and stun<=0 and buffer_time>0:
+			request=buffer
+			buffer=-1
 		if request>=0: attack(request)
 		if action>=0:
 			elapsed+=dt
@@ -119,7 +138,7 @@ func hurtbox() -> Rect2:
 		return Rect2(x-43,448+y,86,116)
 	return Rect2(x-39,354+y,78,210)
 
-func receive(damage: float, dir: float, grab: bool = false, toxic: bool = false, radial: bool = false) -> Dictionary:
+func receive(damage: float, dir: float, grab: bool = false, toxic: bool = false, radial: bool = false, slow: float = 0.0) -> Dictionary:
 	if hp<=0 or (invincible>0 and not radial): return {"hit":false}
 	var guarded=block and not grab
 	var broken=false
@@ -133,7 +152,7 @@ func receive(damage: float, dir: float, grab: bool = false, toxic: bool = false,
 	hp=maxf(0,hp-dealt)
 	flash=0.4 if guarded else 1.0
 	energy=minf(100,energy+(3 if guarded else 7))
-	var armor=kind==1 and action==2 and active()
+	var armor=action>=0 and active() and ((kind==1 and action==2) or move.get("armor",false))
 	stun=0.10 if guarded else (0.65 if broken else 0.24)
 	if armor: stun=0
 	invincible=0.13
@@ -141,4 +160,5 @@ func receive(damage: float, dir: float, grab: bool = false, toxic: bool = false,
 	if not guarded:
 		if not armor: action=-1
 		if toxic: poison=3.0
+		if slow>0: slow_time=slow
 	return {"hit":true,"guarded":guarded,"damage":dealt,"broken":broken}

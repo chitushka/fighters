@@ -39,9 +39,11 @@ func run() -> void:
 	game.audio.set_process(false)
 	game.audio.muted=true
 	# Test moves through the actual combat controller, including collision and hit stop.
-	for kind in 3:
+	check(Data.NAMES.size()>10,"expanded roster has more than ten fighters")
+	check(Data.STAGES.size()==8,"eight arenas available")
+	for kind in Data.NAMES.size():
 		for move in 4:
-			fixture(kind,(kind+1)%3)
+			fixture(kind,(kind+1)%Data.NAMES.size())
 			var defender=game.fighters[1]
 			var old_hp:float=defender.hp
 			check(game.fighters[0].attack(move),"move starts: %s / %s"%[kind,move])
@@ -171,6 +173,49 @@ func run() -> void:
 	Input.action_release("p1_right")
 	check(cpu_did_damage,"CPU attacks and damages player")
 	check(game.screen=="result","full CPU match reaches winner screen")
+	# Real human input can arrive and be released while the combat clock is frozen.
+	fixture(0,1)
+	game.hitstop=0.065
+	var key=InputEventKey.new()
+	key.physical_keycode=KEY_K
+	key.pressed=true
+	game._input(key)
+	key.pressed=false
+	game._input(key)
+	tick(0.16)
+	check(game.fighters[0].action==1,"cobra keeps a special pressed during hit stop")
+	fixture(0,1)
+	game.fighters[0].energy=0
+	check(not game.fighters[0].attack(1),"exhausted cobra cannot spend energy")
+	check(game.fighters[0].feedback_time>0,"insufficient energy has visible feedback")
+	check(game.fighters[0].attack(0),"exhausted cobra can still bite")
+	tick(0.8)
+	check(game.fighters[0].action==-1,"cobra always exits attack recovery")
+	fixture(0,1,400)
+	game.fighters[0].stun=0.15
+	game.fighters[0].attack(1)
+	tick(0.3)
+	check(game.fighters[0].action==1,"cobra keeps input buffered during stun")
+	fixture(0,1,400)
+	Input.action_press("p1_0")
+	for i in 180: game.battle(1.0/60)
+	Input.action_release("p1_0")
+	check(game.fighters[0].name_time>0,"holding J continues normal attacks")
+	var slowed=Fighter.new(4)
+	slowed.receive(30,1,false,false,false,1.5)
+	slowed.stun=0
+	var before_x=slowed.x
+	slowed.step(0.1,{"axis":1},900,1550)
+	check(slowed.x-before_x<Data.SPEED[4]*0.1,"frost reduces movement speed")
+	for i in 20: slowed.step(0.1,{},900,1550)
+	check(slowed.slow_time==0,"slow effect expires")
+	for page in ceili(Data.NAMES.size()/3.0):
+		game.roster_page=page
+		game.activate("roster_next")
+		check(game.roster_page==(page+1)%4,"roster pages wrap")
+	game.stage=Data.STAGES.size()-1
+	game.activate("stage_next")
+	check(game.stage==0,"all arenas wrap back to island")
 	print("COMBAT TESTS: ",checks-failures.size(),"/",checks," passed")
 	game.queue_free()
 	await create_timer(0.15).timeout

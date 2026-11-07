@@ -18,21 +18,35 @@ func run() -> void:
 	game.set_process(false)
 	game.audio.set_process(false)
 	DirAccess.make_dir_recursive_absolute("res://test-results")
-	for i in 3:
+	for i in game.Data.NAMES.size():
+		game.guide_page=i
+		game.screen="guide"
+		await shot("guide_"+str(i))
+	for page in 4:
+		game.roster_page=page
+		game.screen="menu"
+		await shot("roster_"+str(page))
+	for i in game.Data.STAGES.size():
 		game.stage=i
 		game.screen="menu"
 		await shot("menu_"+str(i))
 		game.guide_page=i
 		game.screen="guide"
 		await shot("guide_"+str(i))
-		game.selected=i
-		game.opponent=(i+1)%3
+		game.selected=(i+3)%game.Data.NAMES.size()
+		game.opponent=(i+4)%game.Data.NAMES.size()
 		game.mode=2
 		game.start_match()
 		game.intro=0
 		game.fighters[0].x=450
 		game.fighters[1].x=820
 		await shot("arena_"+str(i))
+	game.selected=2
+	game.opponent=0
+	game.start_match()
+	game.intro=0
+	game.fighters[0].x=450
+	game.fighters[1].x=820
 	game.fighters[0].energy=100
 	game.fighters[0].attack(1)
 	for j in 20: game.battle(1.0/60)
@@ -43,7 +57,7 @@ func run() -> void:
 	game.scores=[2,1]
 	game.screen="result"
 	await shot("result")
-	print("RENDER OK: 12 screens captured")
+	print("RENDER OK: 12 fighters, 4 roster pages, 8 arenas, pause and result")
 	game.queue_free()
 	await process_frame
 	quit()

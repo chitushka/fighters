@@ -42,6 +42,10 @@ var training_reset: float = 0.0
 var capture_frames: int = 0
 var rng = RandomNumberGenerator.new()
 var config = ConfigFile.new()
+var pending_attacks: Array = [-1,-1]
+var pending_until: Array = [0.0,0.0]
+var pending_jumps: Array = [false,false]
+var roster_page: int = 0
 
 func _ready() -> void:
 	font=ThemeDB.fallback_font
@@ -54,6 +58,7 @@ func _ready() -> void:
 	add_child(audio)
 	setup_input()
 	load_settings()
+	roster_page=selected/3 as int
 	get_window().title="ДИКИЙ ИНСТИНКТ • WILD INSTINCT"
 	if "--smoke" in OS.get_cmdline_user_args():
 		start_match()
@@ -84,9 +89,9 @@ func setup_input() -> void:
 func load_settings() -> void:
 	if "--script" in OS.get_cmdline_args(): return
 	if config.load("user://settings.cfg")==OK:
-		selected=clampi(config.get_value("game","fighter",0),0,2)
-		opponent=clampi(config.get_value("game","opponent",1),0,2)
-		stage=clampi(config.get_value("game","stage",0),0,2)
+		selected=clampi(config.get_value("game","fighter",0),0,Data.NAMES.size()-1)
+		opponent=clampi(config.get_value("game","opponent",1),0,Data.NAMES.size()-1)
+		stage=clampi(config.get_value("game","stage",0),0,Data.STAGES.size()-1)
 		difficulty=clampi(config.get_value("game","difficulty",1),0,2)
 		audio.muted=config.get_value("game","muted",false)
 
@@ -100,6 +105,14 @@ func save_settings() -> void:
 	config.save("user://settings.cfg")
 
 func _input(event: InputEvent) -> void:
+	if screen=="battle" and intro<=0 and outro<=0:
+		for player in 2:
+			var prefix="p"+str(player+1)+"_"
+			for i in 4:
+				if event.is_action_pressed(prefix+str(i)):
+					pending_attacks[player]=i
+					pending_until[player]=time+0.25
+			if event.is_action_pressed(prefix+"jump"): pending_jumps[player]=true
 	if event is InputEventMouseMotion:
 		mouse=get_global_mouse_position()
 	if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_LEFT:
@@ -134,9 +147,13 @@ func _input(event: InputEvent) -> void:
 			KEY_R:
 				if screen=="battle" and mode==2: new_round()
 			KEY_LEFT:
-				if screen=="menu": selected=posmod(selected-1,3)
+				if screen=="menu":
+					selected=posmod(selected-1,Data.NAMES.size())
+					roster_page=selected/3 as int
 			KEY_RIGHT:
-				if screen=="menu": selected=(selected+1)%3
+				if screen=="menu":
+					selected=(selected+1)%Data.NAMES.size()
+					roster_page=selected/3 as int
 	queue_redraw()
 
 func activate(id: String) -> void:
@@ -146,9 +163,18 @@ func activate(id: String) -> void:
 	elif id.begins_with("guide_"): guide_page=int(id.trim_prefix("guide_"))
 	else:
 		match id:
-			"stage_prev": stage=posmod(stage-1,3)
-			"stage_next": stage=(stage+1)%3
-			"enemy": opponent=(opponent+1)%3
+			"roster_prev":
+				roster_page=posmod(roster_page-1,ceili(Data.NAMES.size()/3.0))
+				selected=roster_page*3
+			"roster_next":
+				roster_page=(roster_page+1)%ceili(Data.NAMES.size()/3.0)
+				selected=roster_page*3
+			"guide_prev": guide_page=posmod(guide_page-1,Data.NAMES.size())
+			"guide_next": guide_page=(guide_page+1)%Data.NAMES.size()
+			"stage_prev": stage=posmod(stage-1,Data.STAGES.size())
+			"stage_next": stage=(stage+1)%Data.STAGES.size()
+			"enemy": opponent=(opponent+1)%Data.NAMES.size()
+			"enemy_prev": opponent=posmod(opponent-1,Data.NAMES.size())
 			"difficulty": difficulty=(difficulty+1)%3
 			"start","rematch": start_match()
 			"guide":
@@ -189,12 +215,23 @@ func new_round() -> void:
 	ai_cmd={}
 	hitstop=0
 	training_reset=0
+	pending_attacks=[-1,-1]
+	pending_until=[0.0,0.0]
+	pending_jumps=[false,false]
 	audio.play("gong")
 
 func human(prefix: String) -> Dictionary:
+	var player=0 if prefix=="p1_" else 1
 	var cmd={"axis":Input.get_axis(prefix+"left",prefix+"right"),"jump":Input.is_action_just_pressed(prefix+"jump"),"crouch":Input.is_action_pressed(prefix+"crouch"),"block":Input.is_action_pressed(prefix+"block"),"attack":-1}
 	for i in 4:
 		if Input.is_action_just_pressed(prefix+str(i)): cmd.attack=i
+	if pending_attacks[player]>=0 and pending_until[player]>=time:
+		cmd.attack=pending_attacks[player]
+	elif cmd.attack<0 and Input.is_action_pressed(prefix+"0"):
+		cmd.attack=0
+	pending_attacks[player]=-1
+	cmd.jump=cmd.jump or pending_jumps[player]
+	pending_jumps[player]=false
 	return cmd
 
 func cpu(dt: float) -> Dictionary:
@@ -206,7 +243,7 @@ func cpu(dt: float) -> Dictionary:
 	if ai_time<=0:
 		ai_time=[0.42,0.25,0.14][difficulty]+rng.randf_range(0,0.14)
 		ai_cmd={"axis":0,"block":false,"attack":-1,"jump":false}
-		var danger=b.action>=0 or not projectiles.is_empty()
+		var danger=b.action>=0 or projectiles.any(func(p): return p.owner==0)
 		if danger and rng.randf()<[0.22,0.49,0.72][difficulty]:
 			ai_cmd.block=true
 			if dist>230 and rng.randf()<0.35: ai_cmd.jump=true
@@ -311,7 +348,7 @@ func battle(dt: float) -> void:
 		if a.move.get("grab",false): height_ok=absf(b.y)<25 and absf(a.y)<25
 		if dist>0 and dist<a.move.range and height_ok:
 			var scale_damage=pow(0.86,mini(a.combo,4))
-			var result=b.receive(a.move.damage*scale_damage,a.facing,a.move.get("grab",false),a.move.get("poison",false))
+			var result=b.receive(a.move.damage*scale_damage,a.facing,a.move.get("grab",false),a.move.get("poison",false),false,a.move.get("slow",0.0))
 			if result.hit:
 				a.did_hit=true
 				register_hit(i,result,Vector2(b.x,430+b.y))
@@ -321,7 +358,7 @@ func battle(dt: float) -> void:
 		var enemy=fighters[1-p.owner]
 		var h:Rect2=enemy.hurtbox()
 		if h.grow(10).has_point(p.p) and p.life>0:
-			var result=enemy.receive(p.damage,signf(p.v.x),false,false,p.type==1)
+			var result=enemy.receive(p.damage,signf(p.v.x),false,p.get("poison",false),p.type==1,p.get("slow",0.0))
 			if result.hit:
 				register_hit(p.owner,result,p.p)
 				p.life=0
@@ -334,6 +371,7 @@ func battle(dt: float) -> void:
 				f.hp=Data.HP[f.kind]
 				f.energy=100
 				f.poison=0
+				f.slow_time=0
 			training_reset=0
 	elif fighters[0].hp<=0 or fighters[1].hp<=0 or timer<=0:
 		finish_round()
@@ -344,12 +382,16 @@ func shoot(owner: int) -> void:
 	if f.kind==0:
 		projectiles.append({"p":at,"v":Vector2(f.facing*620,0),"owner":owner,"damage":92.0,"life":2.4,"type":0})
 		audio.play("fire")
-	else:
+	elif f.kind==1:
 		# A full radial burst; three lanes can reach an upright opponent.
 		for i in 12:
 			var angle=TAU*i/12.0
 			projectiles.append({"p":Vector2(f.x,443+f.y),"v":Vector2.from_angle(angle)*590,"owner":owner,"damage":32.0,"life":1.8,"type":1})
 		audio.play("spike")
+	else:
+		var spec:Dictionary=f.move
+		projectiles.append({"p":Vector2(f.x+f.facing*70,421+f.y),"v":Vector2(f.facing*660,0),"owner":owner,"damage":spec.damage,"life":2.2,"type":2,"color":Data.COLORS[f.kind],"poison":spec.get("poison",false),"slow":spec.get("slow",0.0)})
+		audio.play("fire",1.25)
 
 func register_hit(owner: int,result: Dictionary,at: Vector2) -> void:
 	var a=fighters[owner]
@@ -450,15 +492,20 @@ func draw_menu() -> void:
 	txt("W / I",Vector2(52,49),25,GOLD,true)
 	txt("WILD INSTINCT",Vector2(139,44),16,WHITE,true)
 	txt("АРКАДНЫЙ ФАЙТИНГ  /  01",Vector2(139,64),10,MUTED)
-	txt("ТРИ ХИЩНИКА. ТРИ МИРА.",Vector2(922,44),13,MUTED)
+	txt(str(Data.NAMES.size())+" БОЙЦОВ. "+str(Data.STAGES.size())+" МИРОВ.",Vector2(922,44),13,MUTED)
 	draw_circle(Vector2(1209,39),4,ORANGE)
 	txt("ДИКИЙ ИНСТИНКТ",Vector2(49,154),68,WHITE,true)
 	txt("Выбери свою природу.",Vector2(53,193),19,MUTED)
 	draw_line(Vector2(52,216),Vector2(1228,216),Color("34414a"),1)
 	txt("01  /  ВЫБЕРИ БОЙЦА",Vector2(52,243),12,GOLD,true)
+	button("roster_prev",Rect2(477,227,34,27),"←")
+	center("БОЙЦЫ "+str(roster_page*3+1)+"–"+str(mini(roster_page*3+3,Data.NAMES.size()))+" / "+str(Data.NAMES.size()),Vector2(615,245),11,MUTED)
+	button("roster_next",Rect2(720,227,34,27),"→")
 	txt("02  /  ВЫБЕРИ АРЕНУ",Vector2(806,243),12,GOLD,true)
-	for i in 3:
-		var r=Rect2(52+i*240,261,222,284)
+	for slot in 3:
+		var i=roster_page*3+slot
+		if i>=Data.NAMES.size(): break
+		var r=Rect2(52+slot*240,261,222,284)
 		var chosen=i==selected
 		var col: Color=Data.COLORS[i]
 		panel(r,Color("16232b") if chosen else Color("101a22"),col if chosen else Color("2d3b43"))
@@ -467,7 +514,7 @@ func draw_menu() -> void:
 			Art.oval(self,r.position+Vector2(111,154),Vector2(53+j*7,84+j*4),Color(col,0.007))
 		Art.oval(self,r.position+Vector2(111,211),Vector2(77,11),Color(0,0,0,0.3))
 		Art.character(self,i,r.position+Vector2(124 if i==2 else 113,214),0.73 if i==2 else 0.77,1,time+i)
-		txt("0"+str(i+1),r.position+Vector2(15,27),13,col,true)
+		txt(str(i+1).pad_zeros(2),r.position+Vector2(15,27),13,col,true)
 		if chosen:
 			txt("ВЫБРАН",r.position+Vector2(139,27),10,col,true)
 		draw_line(r.position+Vector2(14,229),r.position+Vector2(208,229),Color("34414a"),1)
@@ -484,14 +531,15 @@ func draw_menu() -> void:
 	txt(Data.STAGE_TAGS[stage],Vector2(821,489),9,GOLD)
 	button("stage_prev",Rect2(806,506,42,37),"←")
 	button("stage_next",Rect2(1186,506,42,37),"→")
-	center("0"+str(stage+1)+"  /  03",Vector2(1017,530),13,MUTED)
-	for i in 3:
-		draw_circle(Vector2(993+i*23,540),2,GOLD if i==stage else Color("49565d"))
+	center(str(stage+1).pad_zeros(2)+"  /  "+str(Data.STAGES.size()).pad_zeros(2),Vector2(1017,530),13,MUTED)
+	for i in Data.STAGES.size():
+		draw_circle(Vector2(1017+(i-(Data.STAGES.size()-1)*0.5)*18,540),2,GOLD if i==stage else Color("49565d"))
 	txt("03  /  РЕЖИМ БОЯ",Vector2(52,574),12,GOLD,true)
 	var modes=["ПРОТИВ КОМПЬЮТЕРА","ДВА ИГРОКА","ТРЕНИРОВКА"]
 	for i in 3:
 		button("mode_"+str(i),Rect2(52+i*240,587,222,40),modes[i],mode==i)
-	button("enemy",Rect2(806,558,422,34),"СОПЕРНИК: "+Data.NAMES[opponent])
+	button("enemy_prev",Rect2(806,558,34,34),"←")
+	button("enemy",Rect2(847,558,381,34),"СОПЕРНИК: "+Data.NAMES[opponent]+"  →")
 	if mode==0:
 		button("difficulty",Rect2(806,599,422,29),"СЛОЖНОСТЬ: "+["НОВИЧОК","БОЕЦ","ХИЩНИК"][difficulty])
 	else:
@@ -531,9 +579,16 @@ func draw_battle() -> void:
 				draw_circle(p.p-Vector2(dir*j*8,0),18-j*1.7,Color(1,0.27+0.04*j,0.08,0.13+(7-j)*0.035))
 			draw_circle(p.p,14,Color("fc9e46"))
 			draw_circle(p.p+Vector2(dir*3,-2),8,Color("fff0ae"))
-		else:
+		elif p.type==1:
 			var v=p.v.normalized()
 			Art.poly(self,[p.p+v*17,p.p-v*12+v.orthogonal()*4,p.p-v*12-v.orthogonal()*4],Color("e2edb0"))
+		else:
+			var col:Color=p.color
+			var v:Vector2=p.v.normalized()
+			for j in 5:
+				draw_circle(p.p-v*j*9,17-j*2,Color(col,0.18))
+			Art.poly(self,[p.p+v*23,p.p+v.orthogonal()*12,p.p-v*14,p.p-v.orthogonal()*12],col)
+			draw_circle(p.p,6,col.lightened(0.6))
 	for p in particles:
 		draw_line(p.p,p.p-p.v*0.025,Color(p.color,clampf(p.life*2,0,1)),p.size,true)
 	for s in slashes:
@@ -580,6 +635,10 @@ func draw_hud() -> void:
 			draw_circle(Vector2(530-j*18 if i==0 else 750+j*18,115),5,GOLD if scores[i]>j else Color("34424d"))
 		if f.poison>0:
 			txt("ЯД  "+str(snappedf(f.poison,0.1))+" с",Vector2(x+320,119),10,Color("b6d775"))
+		elif f.slow_time>0:
+			txt("ЗАМЕДЛЕНИЕ",Vector2(x+320,119),10,Color("9ce5ff"))
+		if f.feedback_time>0:
+			txt(f.feedback,Vector2(x,190),12,ORANGE,true)
 		if f.name_time>0:
 			var where=Vector2(53,166) if i==0 else Vector2(1226,166)
 			if i==0: txt(f.last_name.to_upper(),where,16,col,true)
@@ -595,7 +654,7 @@ func draw_hud() -> void:
 	center("РАУНД "+str(round_number),Vector2(640,112),9,GOLD)
 	draw_rect(Rect2(0,675,1280,45),Color(0.025,0.04,0.06,0.94))
 	txt("A D  ШАГ    W  ПРЫЖОК    S  ПРИСЕСТЬ",Vector2(30,694),11,MUTED)
-	txt("J  УДАР    K  ДАЛЬНИЙ    L  ОСОБЫЙ    I  УЛЬТА    ПРОБЕЛ  БЛОК",Vector2(367,694),11,WHITE)
+	txt("J  УДАР / УДЕРЖИВАТЬ    K  ДАЛЬНИЙ    L  ОСОБЫЙ    I  УЛЬТА    ПРОБЕЛ  БЛОК",Vector2(341,694),11,WHITE)
 	txt("ESC  ПАУЗА    F1  ПРИЁМЫ    M  ЗВУК",Vector2(30,712),10,Color("687c86"))
 	if mode==1: txt("P2:  ← → ↑ ↓   /   1  2  3  4   /   0  БЛОК",Vector2(778,712),10,GOLD)
 	elif mode==2: txt("R  СБРОС   •   ЗДОРОВЬЕ ВОССТАНАВЛИВАЕТСЯ ЧЕРЕЗ 2 СЕКУНДЫ",Vector2(630,712),10,GOLD)
@@ -628,8 +687,11 @@ func draw_guide() -> void:
 	txt("ПОЛЕВОЙ СПРАВОЧНИК",Vector2(52,63),31,WHITE,true)
 	txt("ИЗУЧИ ИНСТИНКТ. ВЫИГРАЙ БОЙ.",Vector2(53,90),11,GOLD)
 	button("back",Rect2(1068,38,160,39),"←  НАЗАД")
-	for i in 3:
-		button("guide_"+str(i),Rect2(52+i*240,115,222,42),Data.NAMES[i],guide_page==i)
+	for slot in 3:
+		var i=(guide_page/3 as int)*3+slot
+		button("guide_"+str(i),Rect2(52+slot*240,115,222,42),Data.NAMES[i],guide_page==i)
+	button("guide_prev",Rect2(766,115,34,42),"←")
+	button("guide_next",Rect2(807,115,34,42),"→")
 	var col: Color=Data.COLORS[guide_page]
 	panel(Rect2(52,179,293,351),Color("15212a"),col.darkened(0.5))
 	Art.character(self,guide_page,Vector2(219 if guide_page==2 else 203,452),0.94 if guide_page==2 else 1.03,1,time)
